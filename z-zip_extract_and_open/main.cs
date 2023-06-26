@@ -11,7 +11,7 @@ class main {
         var programPath = Path.GetFullPath(".\\7-zip_extract_and_open.bat");
         var programDir = Path.GetDirectoryName(Path.GetFullPath(programPath));
         var _7zGPath = Path.GetFullPath("..\\7zG.exe");
-
+        #region EnvCheck
         if (!File.Exists(_7zGPath))
         {
             Console.WriteLine("ERROR: The program directory is not correct.");
@@ -37,14 +37,15 @@ class main {
             Console.ReadKey();
             return 1;
         }
-
+        #endregion
+        #region prepare extensions list
         // target extensions List
         // key: extension, value: icon path
         var targetExtensions = new List<string> {
-            ".7z",
+              ".7z",
         //    ".ar",
         //    ".arj",
-        //    ".bzip2",
+              ".bz2",
         //    ".cab",
         //    ".chm",
         //    ".cpio",
@@ -53,7 +54,7 @@ class main {
         //    ".ext",
         //    ".fat",
         //    ".gpt",
-              ".gzip",
+              ".gz",
         //    ".hfs",
         //    ".ihex",
         //    ".iso",
@@ -73,9 +74,9 @@ class main {
         //    ".vdi",
         //    ".vhd",
         //    ".vmdk",
-        //    ".wim",
+              ".wim",
         //    ".xar",
-        //    ".xz",
+              ".xz",
         //    ".z",
               ".zip"
         };
@@ -84,88 +85,150 @@ class main {
         {
             extensionAndPathes.Add(extension, Path.Combine(programDir!, iconDir, GetIconName(extension)));
         }
+        #endregion
 
+        #region main process
         // main process
-        foreach(var extension in extensionAndPathes.Keys)
+        foreach (var extension in extensionAndPathes.Keys)
         {
-            if (!IsExtensionAssociated(extension, programPath))
+            var iconPath = extensionAndPathes[extension];
+
+            if (!IsExtensionIconAssociated(extension, iconPath))
             {
-                // backup the registory keys to .reg
-                int ret = BackupRegistory(extension);
-                // When error occurred
-                if(ret != 0) return 1;
 
                 // assosiate with the extension and the icon
-                var iconPath = extensionAndPathes[extension];
-                AssociateExtension(extension, programPath, iconPath);
+                string extensionOrProgId = 
+                    GetExtensionCurrentUserAssociation(extension, 
+                                GetExtensionUserChoice(extension));
+
+                // backup the registory keys to .reg
+                int ret = BackupRegistory(extensionOrProgId);
+                // When error occurred
+                if (ret != 0)
+                {
+                    Console.WriteLine($"ERROR: Cannot export the registry key.\n{extensionOrProgId}");
+                    Console.ReadKey();
+                    return 1;
+                }
+
+                AssociateExtensionIcon(extensionOrProgId, iconPath);
             }
         }
 
         // pause before exit
         Console.WriteLine("Process is completed.");
         Console.ReadKey();
-
         return 0;
 
         #endregion
+        #endregion
         #region functions
-        static string GetExecutablePath()
-        {
-            var entryAssembly = Assembly.GetEntryAssembly();
-            if (entryAssembly != null)
-            {
-                return entryAssembly.Location;
-            }
+        //static string GetExecutablePath()
+        //{
+        //    var entryAssembly = Assembly.GetEntryAssembly();
+        //    if (entryAssembly != null)
+        //    {
+        //        return entryAssembly.Location;
+        //    }
 
-            var uri = new UriBuilder(Assembly.GetExecutingAssembly().CodeBase);
-            return Uri.UnescapeDataString(uri.Path);
-        }
+        //    var uri = new UriBuilder(Assembly.GetExecutingAssembly().Location);
+        //    return Uri.UnescapeDataString(uri.Path);
+        //}
+
         /// <summary>
         /// Check the file is associated or not
         /// </summary>
-        bool IsExtensionAssociated(string extension, string programPath)
+        bool IsExtensionIconAssociated(string extension, string defaultIcon)
+        {
+            // Check extension is associated the program
+            var associatedExtensionUserChoiceKey 
+                = GetExtensionUserChoice(extension);
+            var associatedExtensionCurrentUserKey 
+                = GetExtensionCurrentUserAssociation(extension, associatedExtensionUserChoiceKey);
+
+            bool ret;
+            if(associatedExtensionUserChoiceKey != string.Empty)
+            {
+                ret = GetDefaultIcon(associatedExtensionUserChoiceKey) == defaultIcon;
+            } else
+            {
+                ret = GetDefaultIcon(associatedExtensionCurrentUserKey) == defaultIcon;
+            }
+
+            return ret;
+        }
+
+        string GetExtensionUserChoice(string extension)
         {
             // Get associated value
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Classes\\" + extension + "\\shell\\open\\command\\"))
+            using (RegistryKey key = 
+                    Registry.ClassesRoot.OpenSubKey(
+                    $"HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\{extension}\\UserChoice"
+                  ))
             {
-                string currentKeyValue = "";
+                string progId = "";
                 if (key is not null)
                 {
-                    currentKeyValue = (string) key.GetValue("");
+                    progId = (string)key.GetValue("");
+                }
+                return progId;
+            }
+        }
+
+        string GetExtensionCurrentUserAssociation(string extension, string userChoiceProgId)
+        {
+            // Get associated value
+            using (RegistryKey progId = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{userChoiceProgId}"))
+            {
+                if (progId is not null)
+                {
+                    return (string)progId.GetValue("");
                 }
 
-                // Check extension is associated the program
-                return currentKeyValue == $"\"{programPath}\" \"%1\"";
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{extension}"))
+                {
+                    if (key is not null)
+                    {
+                        return (string)key.GetValue("");
+                    }
+                }
             }
+            return string.Empty;
+        }
+        string GetDefaultIcon(string extensionOrProgId)
+        {
+            // Get associated value
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{extensionOrProgId}"))
+            {
+                if (key is not null)
+                {
+                    return (string)key.GetValue("");
+                }
+            }
+            return string.Empty;
         }
 
         /// <summary>
         /// associate the extension with the icon
         /// </summary>
-        void AssociateExtension(string extension, string programPath, string iconPath)
+        void AssociateExtensionIcon(string extensionOrProgId, string iconPath)
         {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey("Software\\Classes").CreateSubKey(extension + "\\DefaultIcon"))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey("Software\\Classes").CreateSubKey(extensionOrProgId + "\\DefaultIcon"))
             {
                 key.SetValue("", iconPath);
-            }
-
-            //creating HKEY_CURRENT_USER\Software\Classes\{extension}\shell\open\command
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey("Software\\Classes").CreateSubKey(extension + "\\shell\\open\\command"))
-            {
-                key.SetValue("", $"\"{programPath}\" \"%1\"");
             }
         }
 
         /// <summary>
         /// backup the registory keys to .reg
         /// </summary>
-        int BackupRegistory(string extension)
+        int BackupRegistory(string extensionOrProgId)
         {
             // backup from the extension key
-            string registryKeyPath = $"HKEY_CURRENT_USER\\SOFTWARE\\Classes\\{extension}";
+            string registryKeyPath = $"HKEY_CURRENT_USER\\SOFTWARE\\Classes\\{extensionOrProgId}";
 
             // add datetime in filename
-            var backupFileName = DateTime.Now.ToString("yyyyMMddHHmmss") + extension + ".reg";
+            var backupFileName = DateTime.Now.ToString("yyyyMMddHHmmss") + extensionOrProgId + ".reg";
             var backupFileDir = Path.Combine(programDir!, "backup");
             if (!Directory.Exists(backupFileDir)) Directory.CreateDirectory(backupFileDir);
 
@@ -184,7 +247,7 @@ class main {
                         throw new IOException("Backup failed");
                     }
                 }
-                Console.WriteLine($"{extension} backup file was created. {backupFilePath}");
+                Console.WriteLine($"{extensionOrProgId} backup file was created at {backupFilePath}");
             }
             catch (Exception ex)
             {
