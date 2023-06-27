@@ -10,29 +10,83 @@ class main {
 
     static public int Main(string[] args)
     {
+        var isUninstall = args.Length > 0 && (args[0] == "-u" || args[0] == "-U");
+        if (!isUninstall)
+        {
+            Console.WriteLine("*Warning*\r\n\r\nThis application rewrites the Windows registry.\r\nUse at your own risk.\r\n\r\nAlso, to uninstall changes made by this app, run it with administrator privileges and the argument -u.\r\nExample: 7-zip_custom_icon_associator.exe -u\r\n\r\nEnter y to continue.\r\n\r\n(y)es/(n)o");
+            ConsoleKeyInfo input;
+            while (true)
+            {
+                input = Console.ReadKey();
+                if (input.KeyChar == 'y')
+                {
+                    input = Console.ReadKey();
+                    if (input.Key == ConsoleKey.Enter)
+                    {
+                        // go to next
+                        break;
+                    }
+                }
+                else
+                {
+                    input = Console.ReadKey();
+                    if (input.Key == ConsoleKey.Enter)
+                    {
+                        return 0;
+                    }
+                }
+            }
+        } else { 
+            Console.WriteLine("Uninstall this application change. Press y to continue.\r\n\r\n(y)es/(n)o");
+            ConsoleKeyInfo input;
+            while (true)
+            {
+                input = Console.ReadKey();
+                if (input.KeyChar == 'y')
+                {
+                    input = Console.ReadKey();
+                    if (input.Key == ConsoleKey.Enter)
+                    {
+                        // go to next
+                        break;
+                    }
+                }
+                else
+                {
+                    if (input.Key == ConsoleKey.Enter)
+                    {
+                        return 0;
+                    }
+                }
+            }
+        }
+
         #region CONST
         const string DEFAULT_ICON = "DefaultIcon";
         #endregion
         #region Main
+        
 
         var programName = "7-zip_extract_and_open.bat";
         var programPath = Path.GetFullPath($".\\{programName}");
         var programDir = Path.GetDirectoryName(Path.GetFullPath(programPath));
         var programCommand = $"\"{programPath}\" %1";
         var _7zGPath = Path.GetFullPath("..\\7zG.exe");
+        var logFilePath = ".\\7-zip_custom_icon_associator.log";
+
         #region EnvCheck
         if (!File.Exists(_7zGPath))
         {
-            Console.WriteLine("ERROR: The program directory is not correct.");
-            Console.WriteLine(_7zGPath);
+            log("ERROR: The program directory is not correct.");
+            log(_7zGPath);
             Console.ReadKey();
             return 1;
         }
 
         if (!File.Exists(programPath))
         {
-            Console.WriteLine("ERROR: The program does not exist.");
-            Console.WriteLine(programPath);
+            log("ERROR: The program does not exist.");
+            log(programPath);
             Console.ReadKey();
             return 1;
         }
@@ -41,8 +95,8 @@ class main {
 
         if (!Directory.Exists(iconDir))
         {
-            Console.WriteLine("ERROR: The icon directory does not exist.");
-            Console.WriteLine(iconDir);
+            log("ERROR: The icon directory does not exist.");
+            log(iconDir);
             Console.ReadKey();
             return 1;
         }
@@ -106,6 +160,12 @@ class main {
         // main process
         foreach (var extension in extensionAndPathes.Keys)
         {
+            if(isUninstall)
+            {
+                Uninstall(extension);
+                continue;
+            }
+
             // create the extension class if it does'nt exist
             CreateClassIfNotExists(extension);
 
@@ -120,7 +180,7 @@ class main {
                 // When error occurred
                 if (ret != 0)
                 {
-                    Console.WriteLine($"ERROR: Cannot export the registry key.\n{progId}");
+                    log($"ERROR: Cannot export the registry key.\n{progId}");
                     Console.ReadKey();
                     return 1;
                 }
@@ -134,13 +194,56 @@ class main {
         }
 
         // pause before exit
-        Console.WriteLine("\nProcess is completed.");
+        log("\nProcess is completed.");
         Console.ReadKey();
         return 0;
 
         #endregion
         #endregion
         #region functions
+
+        /// <summary>
+        /// Uninstall associates and icons
+        /// </summary>
+        void Uninstall(string extension)
+        {
+            //Existence check and delete
+            var applicationsKey = $"Software\\Classes\\Applications\\{programName}";
+            if (IsExistsSubKey(applicationsKey))
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(applicationsKey);
+                log($"{applicationsKey} was deleted.");
+            }
+
+            var extension_auto_file_key = $"Software\\Classes\\{Get_extension_auto_file(extension)}";
+            if (IsExistsSubKey(extension_auto_file_key))
+            {
+                
+                var defaultIconKey = $"{extension_auto_file_key}\\{DEFAULT_ICON}";
+                if(IsExistsSubKey(defaultIconKey))
+                {
+                    Registry.CurrentUser.DeleteSubKey(defaultIconKey);
+                    log($"{defaultIconKey} was deleted.");
+                }
+                
+                var extensionAutoFileKey = $"{extension_auto_file_key}\\shell";
+                if (IsExistsSubKey(extensionAutoFileKey)) {
+                    Registry.CurrentUser.DeleteSubKeyTree(extensionAutoFileKey);
+                    log($"{extensionAutoFileKey} was deleted.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// check registry sub key exists
+        /// </summary>
+        bool IsExistsSubKey(string keyPath)
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(keyPath))
+            {
+                return key is not null;
+            }
+        }
 
         /// <summary>
         /// set default icon for 7-zip_extract_and_open.bat
@@ -299,7 +402,7 @@ class main {
                 if (key is not null)
                 {
                     object? v = key.GetValue("");
-                    return v is not null && ((string) v).EndsWith(programName);
+                    return v is not null && ((string) v).EndsWith(programCommand);
                 }
                 return false;
             }
@@ -315,7 +418,7 @@ class main {
             string registryKeyPath = $"{classesRegistryPath}\\{progId}";
 
             if (Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Classes\\{progId}") == null) {
-                Console.WriteLine($"{registryKeyPath} does not exist in registry. then it will be passed.");
+                log($"{registryKeyPath} does not exist in registry. then it will be passed.");
                 return 0;
             }
 
@@ -324,16 +427,14 @@ class main {
             var backupFileDir = Path.Combine(programDir!, "backup");
             if (!Directory.Exists(backupFileDir)) Directory.CreateDirectory(backupFileDir);
 
-#pragma warning disable CS8604
-                var backupFilePath = Path.Combine(backupFileDir, backupFileName);
-#pragma warning restore CS8604
+            var backupFilePath = Path.Combine(backupFileDir, backupFileName);
 
             try
             {
                 using (Process process = new Process())
                 {
                     process.StartInfo.FileName = "regedit.exe";
-                    Console.WriteLine($"/e \"{backupFilePath}\" \"{registryKeyPath}\\shell\\open\\command\"");
+                    log($"/e \"{backupFilePath}\" \"{registryKeyPath}\\shell\\open\\command\"");
                     process.StartInfo.Arguments = $"/e \"{backupFilePath}\" \"{registryKeyPath}\"";
                     process.Start();
                     process.WaitForExit();
@@ -343,17 +444,17 @@ class main {
                     }
                     if (!File.Exists(backupFilePath))
                     {
-                        Console.WriteLine("ERROR: Cannot export registry. " + registryKeyPath);
+                        log("ERROR: Cannot export registry. " + registryKeyPath);
                     }
                     else
                     {
-                        Console.WriteLine($"{progId} backup file was created at {backupFilePath}");
+                        log($"{progId} backup file was created at {backupFilePath}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("An error is occurred." + "\n" + ex.Message + "\n" + ex.StackTrace);
+                log("An error is occurred." + "\n" + ex.Message + "\n" + ex.StackTrace);
                 Console.ReadKey();
                 return 1;
             }
@@ -363,6 +464,11 @@ class main {
 
         string GetIconName(string extension) => extension.Substring(1) + ".ico";
         string Get_extension_auto_file(string extension) => extension.Replace(".", "") + "_auto_file";
+        void log(string message)
+        {
+            Console.WriteLine(message);
+            File.AppendAllText(logFilePath!, $"{DateTime.Now}: {message}{Environment.NewLine}");
+        }
         #endregion
     }
 }
