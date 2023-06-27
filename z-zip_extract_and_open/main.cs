@@ -10,6 +10,9 @@ class main {
 
     static public int Main(string[] args)
     {
+        #region CONST
+        const string DEFAULT_ICON = "DefaultIcon";
+        #endregion
         #region Main
 
         var programName = "7-zip_extract_and_open.bat";
@@ -45,6 +48,10 @@ class main {
         }
         #endregion
         #region prepare extensions list
+
+        // Set default icon for the .bat
+        SetDefalaultIconOf7zip_extract_and_open_bat();
+
         // target extensions List
         // commented out i don't know what it is or think it should not be in
         // key: extension, value: icon path
@@ -99,8 +106,10 @@ class main {
         // main process
         foreach (var extension in extensionAndPathes.Keys)
         {
-            var iconPath = extensionAndPathes[extension];
+            // create the extension class if it does'nt exist
+            CreateClassIfNotExists(extension);
 
+            var iconPath = extensionAndPathes[extension];
             if (!IsExtensionIconAssociated(extension, iconPath))
             {
                 // assosiate with the extension and the icon
@@ -117,7 +126,7 @@ class main {
                 }
 
                 AssociateExtensionIcon(progId, iconPath);
-                if(!HasSetExtensionCommand(progId))
+                if(!HasSetExtensionCommand(progId) || IsSet_7zip_extract_and_open_bat(progId))
                 {
                     AssociateExtensionCommand(progId, programCommand);
                 }
@@ -125,13 +134,54 @@ class main {
         }
 
         // pause before exit
-        Console.WriteLine("Process is completed.");
+        Console.WriteLine("\nProcess is completed.");
         Console.ReadKey();
         return 0;
 
         #endregion
         #endregion
         #region functions
+
+        /// <summary>
+        /// set default icon for 7-zip_extract_and_open.bat
+        /// </summary>
+        void SetDefalaultIconOf7zip_extract_and_open_bat()
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\Applications\\{programName}\\{DEFAULT_ICON}", true))
+            {
+                if(key != null)
+                {
+                    key.SetValue("", Path.Combine(programDir!, iconDir, "icon.ico"));
+                } else
+                {
+                    Registry.CurrentUser.CreateSubKey($"Software\\Classes\\Applications\\{programName}\\{DEFAULT_ICON}");
+                    using (RegistryKey newKey = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\Applications\\{programName}", true))
+                    {
+                        if (newKey != null)
+                        {
+                            newKey.SetValue("", Path.Combine(programDir!, iconDir, "icon.ico"));
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// create an extension class if it does'nt exist
+        /// </summary>
+        void CreateClassIfNotExists(string extension)
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{extension}"))
+            {
+                if (key is null)
+                {
+                    using (RegistryKey newKey = Registry.CurrentUser.CreateSubKey($"Software\\Classes\\{extension}"))
+                    {
+                        newKey.SetValue("", Get_extension_auto_file(extension));
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// check default icon is associated or not
@@ -159,19 +209,16 @@ class main {
             // key value is "Application\7-zip_extract_and_open.bat" then
             // the target is HKEY_CURRENT_USER\Software\Classes\xz_auto_file and It should be created if it does'nt exist
             using (RegistryKey key = 
-                    Registry.CurrentUser.OpenSubKey(
-                    $"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\{extension}\\UserChoice"
-                  ))
+                    Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\{extension}\\UserChoice"))
             {
                 string? progId = "";
-                string extension_auto_file = extension.Replace(".", "") + "_auto_file";
+                string extension_auto_file = Get_extension_auto_file(extension);
                 if (key is not null)
                 {
                     progId = (string)key.GetValue("ProgID");
 
                     if (progId is not null && progId.StartsWith("Applications\\7-zip_extract_and_open"))
                     {
-                        // if it is Applications\\7-zip_extract_and_open then create {extension}_auto_file
                         progId = extension_auto_file;
                     } else if (progId is null) {
                         // create {extension}_auto_file
@@ -197,7 +244,7 @@ class main {
             {
                 if (key is not null)
                 {
-                    var ret = (string)key.GetValue("DefaultIcon");
+                    var ret = (string)key.GetValue(DEFAULT_ICON);
                     if (ret is null) return "";
                     return ret;
                 }
@@ -210,7 +257,7 @@ class main {
         /// </summary>
         void AssociateExtensionIcon(string extensionOrProgId, string iconPath)
         {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey("Software\\Classes").CreateSubKey(extensionOrProgId + "\\DefaultIcon"))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey("Software\\Classes").CreateSubKey(extensionOrProgId + $"\\{DEFAULT_ICON}"))
             {
                 key.SetValue("", iconPath);
             }
@@ -226,13 +273,33 @@ class main {
             }
         }
 
+        /// <summary>
+        /// check the extension open command has been set
+        /// </summary>
         bool HasSetExtensionCommand(string progId)
         {
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{progId}\\shell\\open\\command"))
             {
                 if(key is not null)
                 {
-                    return key.GetValue("") is not null && (string) key.GetValue("") != "";
+                    object? v = key.GetValue("");
+                    return v is not null && (string) v != "";
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// check the extension open command is 7-zip_extract_and_open.bat
+        /// </summary>
+        bool IsSet_7zip_extract_and_open_bat(string progId)
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\{progId}\\shell\\open\\command"))
+            {
+                if (key is not null)
+                {
+                    object? v = key.GetValue("");
+                    return v is not null && ((string) v).EndsWith(programName);
                 }
                 return false;
             }
@@ -241,15 +308,19 @@ class main {
         /// <summary>
         /// backup the registory keys to .reg
         /// </summary>
-        int BackupRegistry(string extensionOrProgId)
+        int BackupRegistry(string progId)
         {
             // backup from the extension key
-            string registryKeyPath = $"HKEY_CURRENT_USER\\SOFTWARE\\Classes\\{extensionOrProgId}";
+            string classesRegistryPath = "HKEY_CURRENT_USER\\SOFTWARE\\Classes";
+            string registryKeyPath = $"{classesRegistryPath}\\{progId}";
 
-            if (Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Classes\\{extensionOrProgId}") == null) return 1;
+            if (Registry.CurrentUser.OpenSubKey($"SOFTWARE\\Classes\\{progId}") == null) {
+                Console.WriteLine($"{registryKeyPath} does not exist in registry. then it will be passed.");
+                return 0;
+            }
 
             // add datetime in filename
-            var backupFileName = DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + Path.GetFileName(extensionOrProgId) + ".reg";
+            var backupFileName = DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + Path.GetFileName(progId) + ".reg";
             var backupFileDir = Path.Combine(programDir!, "backup");
             if (!Directory.Exists(backupFileDir)) Directory.CreateDirectory(backupFileDir);
 
@@ -270,14 +341,14 @@ class main {
                     {
                         throw new IOException("Backup failed");
                     }
-                }
-                if (!File.Exists(backupFilePath))
-                {
-                    Console.WriteLine("ERROR: Cannot export registry. " + registryKeyPath);
-                }
-                else
-                { 
-                    Console.WriteLine($"{extensionOrProgId} backup file was created at {backupFilePath}");
+                    if (!File.Exists(backupFilePath))
+                    {
+                        Console.WriteLine("ERROR: Cannot export registry. " + registryKeyPath);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"{progId} backup file was created at {backupFilePath}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -291,6 +362,7 @@ class main {
         }
 
         string GetIconName(string extension) => extension.Substring(1) + ".ico";
+        string Get_extension_auto_file(string extension) => extension.Replace(".", "") + "_auto_file";
         #endregion
     }
 }
