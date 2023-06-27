@@ -258,11 +258,14 @@ class main {
                 } else
                 {
                     Registry.CurrentUser.CreateSubKey($"Software\\Classes\\Applications\\{programName}\\{DEFAULT_ICON}");
+                    log($"Software\\Classes\\Applications\\{programName}\\{DEFAULT_ICON} key was created.");
                     using (RegistryKey newKey = Registry.CurrentUser.OpenSubKey($"Software\\Classes\\Applications\\{programName}", true))
                     {
                         if (newKey != null)
                         {
                             newKey.SetValue("", Path.Combine(programDir!, iconDir, "icon.ico"));
+                            log($"Software\\Classes\\Applications\\{programName}\\Path.Combine(programDir!, iconDir) key was created.");
+
                         }
                     }
                 }
@@ -281,6 +284,8 @@ class main {
                     using (RegistryKey newKey = Registry.CurrentUser.CreateSubKey($"Software\\Classes\\{extension}"))
                     {
                         newKey.SetValue("", Get_extension_auto_file(extension));
+                        log($"Software\\Classes\\{extension} key was created.");
+
                     }
                 }
             }
@@ -374,6 +379,7 @@ class main {
             {
                 key.SetValue("", command);
             }
+            log($"Software\\Classes\\{progId}\\shell\\open\\command key was created.");
         }
 
         /// <summary>
@@ -434,7 +440,7 @@ class main {
                 using (Process process = new Process())
                 {
                     process.StartInfo.FileName = "regedit.exe";
-                    log($"/e \"{backupFilePath}\" \"{registryKeyPath}\\shell\\open\\command\"");
+                    log($"start process: regedit.exe /e \"{backupFilePath}\" \"{registryKeyPath}\\shell\\open\\command\"");
                     process.StartInfo.Arguments = $"/e \"{backupFilePath}\" \"{registryKeyPath}\"";
                     process.Start();
                     process.WaitForExit();
