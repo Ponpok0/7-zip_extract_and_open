@@ -1,18 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
 rem ////////////////////////  Setting  /////////////////////////
-rem /NOTE:if you want place this bat in different directory, ///
-rem /////just set 7zG.exe path ↓ //////////////////////////////
 
-rem set YOUR_7-ZIP_DIRECTORY="%~dp07zG.exe"
-set YOUR_7-ZIP_PATH="%~dp0..\\7zG.exe"
-if not exist %YOUR_7-ZIP_PATH% (
+set PATH_OF_7-ZIP_G_EXE="%~dp0..\\7zG.exe"
+if not exist %PATH_OF_7-ZIP_G_EXE% (
     echo 7zG.exe does not exist
-    echo %YOUR_7-ZIP_PATH%
+    echo %PATH_OF_7-ZIP_G_EXE%
     pause
 )
-
-rem /////just set 7zG.exe path ↑ //////////////////////////////
 
 rem //////////////////////// Variables /////////////////////////
 rem %* gets all args for file name separated by spaces
@@ -56,14 +51,14 @@ rem echo desktop %DESKTOP_PATH%
 rem echo dest %DEST_PATH%
 rem echo dest2 %DEST_PATH%\!FILENAME_WITHOUT_EXT!
 rem pause
-rem echo %YOUR_7-ZIP_PATH% x %SRC_FILE_PATH% -o"%DEST_PATH%\*"
+rem echo %PATH_OF_7-ZIP_G_EXE% x %SRC_FILE_PATH% -o"%DEST_PATH%\*"
 rem pause
 rem open folder when successed
 rem echo "%DEST_PATH%\!FILENAME_WITHOUT_EXT!"
 rem pause
 
 rem //////////////////// Main Process //////////////////////////
-%YOUR_7-ZIP_PATH% x %SRC_FILE_PATH% -o"%DEST_PATH%\*"
+%PATH_OF_7-ZIP_G_EXE% x %SRC_FILE_PATH% -o"%DEST_PATH%\*"
 if %ERRORLEVEL% neq 0 exit 1
 explorer.exe "%DEST_PATH%\!FILENAME_WITHOUT_EXT!"
 
