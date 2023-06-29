@@ -1,5 +1,6 @@
 # 7-zip_extract_and_open
 This application is an extension for 7-zip that unzips the file to the desktop when double-clicked and opens the folder in Explorer.
+![icons](https://github.com/Ponpok0/7-zip_extract_and_open/assets/89362710/ddcc100a-758b-4d72-9585-d0eb83cb1bc7)
 
 # Installation
 ## 1. Install 7-zip
