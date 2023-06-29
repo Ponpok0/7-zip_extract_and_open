@@ -6,6 +6,9 @@ This application is an extension for 7-zip that unzips the file to the desktop w
    Download 7-zip and install it from https://www.7-zip.org/download.html
    
 ## 2. Place this 7-zip_extract_and_open folder in the 7-zip installation folder
+   Compile or download 7-zip_extract_and_open from release page<br>
+   https://github.com/Ponpok0/7-zip_extract_and_open/releases<br>
+   
    Example: When you have installed 7-zip in C:\Program Files\7-Zip, place to C:\Program Files\7-Zip\7-zip_extract_and_open
 
 ## 3. Associate compressed file with 7-zip_extract_and_open.bat
@@ -46,6 +49,9 @@ This application is an extension for 7-zip that unzips the file to the desktop w
 ダウンロードとインストールを行ってください。
 
 ## 2. 7-zip_extract_and_openフォルダーを7-zipをインストールしたフォルダーに配置してください。
+7-zip_extract_and_openをコンパイルするかReleaseページからダウンロードしてください。<br>
+https://github.com/Ponpok0/7-zip_extract_and_open/releases<br>
+
 C:\Program Files\7-Zip にインストールしていたら C:\Program Files\7-Zip\7-zip_extract_and_open です。
 
 ## 3. 圧縮ファイルと7-zip_extract_and_open.batを関連付けてください。
